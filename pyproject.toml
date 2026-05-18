@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "praxis"
+version = "0.1.0"
+description = "Self-extending agent infrastructure — planning, protocols, and capability creation"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.0",
+    "python-frontmatter>=1.1",
+]
+
+[project.scripts]
+praxis = "praxis.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["praxis"]
