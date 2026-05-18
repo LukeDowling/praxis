@@ -183,9 +183,3 @@ Capabilities are loaded from `capabilities/` on startup and can be installed mid
 | `accept_patch` | Finalise a pending patch |
 | `revert_capability` | Undo the last patch |
 | `get_agent_protocol` | Return the session protocol rules |
-
----
-
-## Testing
-
-See `testing.md` for the repeatable cross-agent test suite.
