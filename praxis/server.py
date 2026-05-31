@@ -918,6 +918,31 @@ _CODEX_PLUGIN_MANIFEST = {
     },
 }
 
+_CODEX_SLASH_COMMAND_CONTENT = """\
+---
+description: Start a Praxis planning session by loading active plans, protocols, and session rules.
+argument-hint: [focus]
+allowed-tools: [mcp__praxis__get_briefing, mcp__praxis__get_agent_protocol, mcp__praxis__list_protocols, tool_search_tool]
+---
+
+You are entering Praxis mode. Do the following now, in order:
+
+1. Call `get_briefing` to load the current state of all active plans.
+2. Call `get_agent_protocol` to load the session protocol.
+3. Load all tools needed this session via ToolSearch:
+   select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities
+4. Call list_protocols() to see available playbooks.
+5. Follow the protocol for the remainder of this session.
+
+Core rules that apply for the entire session regardless of context:
+- Never answer a question about plan content without first reading the relevant plan.
+- Never write to a plan without confirming the target plan name with the user first.
+- Never attempt to complete an action from memory — always fetch the Next Actions list
+  and ask the user to confirm which item to close.
+
+$ARGUMENTS
+"""
+
 _CODEX_MARKETPLACE = {
     "name": "praxis-local",
     "interface": {
@@ -1073,17 +1098,20 @@ def _install_codex_plugin(project: Path) -> None:
     plugin_root = project / "plugins" / "praxis"
     manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
     mcp_path = plugin_root / ".mcp.json"
+    command_path = plugin_root / "commands" / "praxis.md"
     runner_path = plugin_root / "scripts" / "run-praxis-mcp"
     marketplace_path = project / ".agents" / "plugins" / "marketplace.json"
 
     _write_text(manifest_path, json.dumps(_CODEX_PLUGIN_MANIFEST, indent=2) + "\n")
     _write_text(mcp_path, json.dumps(_codex_mcp_config(project), indent=2) + "\n")
+    _write_text(command_path, _CODEX_SLASH_COMMAND_CONTENT)
     _write_text(runner_path, _CODEX_RUNNER)
     runner_path.chmod(0o755)
     _upsert_marketplace_plugin(project)
 
     print(f"Installed Codex plugin manifest at {manifest_path}")
     print(f"Installed Codex MCP config at {mcp_path}")
+    print(f"Installed Codex /praxis command at {command_path}")
     print(f"Installed Codex marketplace entry at {marketplace_path}")
     print("Restart Codex to pick up the default Praxis plugin.")
 
