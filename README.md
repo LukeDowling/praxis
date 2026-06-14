@@ -176,6 +176,8 @@ Capabilities are loaded from `capabilities/` on startup and can be installed mid
 | `list_protocols` | All available protocol playbooks |
 | `find_protocol` | Find a protocol matching an action description |
 | `create_protocol` | Create a new reusable protocol |
+| `patch_protocol` | Replace one section's body in an existing protocol (prefer over recreating) |
+| `add_protocol_step` | Append a single auto-numbered step to a protocol's Steps section |
 | `list_capabilities` | All capability specs and installed tools |
 | `create_capability_spec` | Propose a new tool (pending user approval) |
 | `install_capability` | Install an approved capability spec live |

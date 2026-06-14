@@ -802,6 +802,78 @@ def create_protocol(
     return f"Protocol '{name}' created."
 
 
+# Matches a top-level numbered step line, e.g. "14. Do the thing" or "14) Do it".
+# Anchored with no leading whitespace so indented sub-bullets are not counted.
+_STEP_NUM_RE = re.compile(r"^(\d+)[.)]\s")
+
+
+def _load_protocol(name: str) -> Plan:
+    """Load a plan and assert it is a protocol, with a clear error otherwise."""
+    plan = _load(name)
+    if plan.status != "protocol":
+        raise ValueError(f"'{name}' is not a protocol (status: '{plan.status}').")
+    return plan
+
+
+@mcp.tool()
+def patch_protocol(name: str, section: str, content: str) -> str:
+    """
+    Replace a named section's body in an existing protocol.
+
+    Prefer this over create_protocol for maintenance edits — adding a step, fixing
+    a bullet, extending the Notes list. It rewrites only the targeted section and
+    leaves frontmatter (name, status: protocol), the Trigger keyword block, and
+    every other section byte-identical. Section match is case-insensitive.
+
+    Fetch the current section first with get_section(name, section), edit that
+    text, and pass the full new body as content. For a plain top-level step
+    append, add_protocol_step is lighter (no need to re-supply the section).
+
+    Raises ValueError if the protocol or the named section does not exist — it
+    will not silently create either. Re-running with identical content is a no-op.
+    """
+    plan = _load_protocol(name)
+    key = _find_section_key(plan.sections, section)
+    if key is None:
+        available = list(plan.sections.keys())
+        raise ValueError(
+            f"Section '{section}' not found in protocol '{name}'. Available: {available}"
+        )
+    plan.sections[key] = content.strip()
+    _save(plan)
+    return f"Section '{key}' patched in protocol '{name}'."
+
+
+@mcp.tool()
+def add_protocol_step(name: str, step: str) -> str:
+    """
+    Append a single checklist item to a protocol's Steps section without
+    rewriting it. The next number is detected from the existing top-level numbered
+    items (after "14." the new item becomes "15."); if Steps is not numbered the
+    item is appended as a "- " bullet. Any leading number or bullet you include in
+    step is stripped to avoid duplication.
+
+    Use patch_protocol instead for edits other than a top-level append — e.g.
+    inserting a sub-bullet under an existing step or editing another section.
+
+    Raises ValueError if the protocol or its Steps section does not exist.
+    """
+    plan = _load_protocol(name)
+    key = _find_section_key(plan.sections, "steps")
+    if key is None:
+        raise ValueError(f"Protocol '{name}' has no 'Steps' section.")
+
+    existing = plan.sections[key]
+    text = re.sub(r"^\s*(?:\d+[.)]|[-*])\s+", "", step.strip())
+
+    numbers = [int(m.group(1)) for l in existing.splitlines() if (m := _STEP_NUM_RE.match(l))]
+    entry = f"{max(numbers) + 1}. {text}" if numbers else f"- {text}"
+
+    plan.sections[key] = f"{existing.rstrip()}\n{entry}" if existing.strip() else entry
+    _save(plan)
+    return f"Appended step to protocol '{name}': {entry}"
+
+
 # ── Session protocol definition ────────────────────────────────────────────────
 
 _PROTOCOL = """\
@@ -864,6 +936,12 @@ For any next action, follow this order:
    loop back to step 1 for each sub-action.
 5. If the action will recur and no protocol exists: call create_protocol after
    completing to codify the steps for next time.
+6. If an existing protocol needs a maintenance edit (add/fix a step, extend the
+   Notes list): never recreate it with create_protocol and never hand-edit the
+   .md. Use patch_protocol(name, section, content) to replace one section's body
+   (fetch it first with get_section), or add_protocol_step(name, step) to append
+   a single numbered step. These leave frontmatter, the Trigger block, and
+   untouched sections byte-identical.
 
 ## Session close
 Before closing, check: any unlogged decisions? any completed actions not yet ticked off?
@@ -880,7 +958,7 @@ You are entering Praxis mode. Do the following now, in order:
 1. Call `get_briefing` to load the current state of all active plans.
 2. Call `get_agent_protocol` to load the session protocol.
 3. Load all tools needed this session via ToolSearch:
-   select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities
+   select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__patch_protocol,mcp__praxis__add_protocol_step,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities
 4. Call list_protocols() to see available playbooks.
 5. Follow the protocol for the remainder of this session.
 
@@ -930,7 +1008,7 @@ You are entering Praxis mode. Do the following now, in order:
 1. Call `get_briefing` to load the current state of all active plans.
 2. Call `get_agent_protocol` to load the session protocol.
 3. Load all tools needed this session via ToolSearch:
-   select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities
+   select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__patch_protocol,mcp__praxis__add_protocol_step,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities
 4. Call list_protocols() to see available playbooks.
 5. Follow the protocol for the remainder of this session.
 
@@ -962,7 +1040,7 @@ Do the following immediately, in order:
 1. Call `get_briefing` to load the current state of all active plans.
 2. Call `get_agent_protocol` to load the session protocol.
 3. Load all tools needed this session via ToolSearch:
-   `select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities`
+   `select:mcp__praxis__create_plan,mcp__praxis__add_next_action,mcp__praxis__complete_next_action,mcp__praxis__log_decision,mcp__praxis__update_section,mcp__praxis__find_protocol,mcp__praxis__create_protocol,mcp__praxis__patch_protocol,mcp__praxis__add_protocol_step,mcp__praxis__list_protocols,mcp__praxis__create_capability_spec,mcp__praxis__install_capability,mcp__praxis__patch_capability,mcp__praxis__accept_patch,mcp__praxis__revert_capability,mcp__praxis__list_capabilities`
 4. Call `list_protocols` to see available playbooks.
 5. Follow the protocol for the remainder of this session.
 
